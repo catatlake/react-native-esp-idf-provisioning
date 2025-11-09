@@ -79,6 +79,19 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
     return ContextCompat.checkSelfPermission(reactApplicationContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
   }
 
+  private fun hasWifiScanPermissions(): Boolean {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      val hasNearbyWifiDevicesPermission =
+        ContextCompat.checkSelfPermission(reactApplicationContext, Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+
+      if (hasNearbyWifiDevicesPermission) {
+        return true
+      }
+    }
+
+    return hasFineLocationPermission()
+  }
+
   @SuppressLint("MissingPermission")
   @ReactMethod
   override fun searchESPDevices(devicePrefix: String, transport: String, security: Double, promise: Promise?) {
@@ -155,8 +168,8 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
         }
       })
     } else {
-      if (!hasWifiPermission() || !hasFineLocationPermission()) {
-        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION"))
+      if (!hasWifiPermission() || !hasWifiScanPermissions()) {
+        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION or NEARBY_WIFI_DEVICES"))
       }
 
       espProvisionManager.searchWiFiEspDevices(devicePrefix, object : WiFiScanListener {
@@ -216,12 +229,6 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
     username: String?,
     promise: Promise?
   ) {
-    // Permission checks
-    if (!hasBluetoothPermissions()) {
-      promise?.reject(Error("Missing one of the following permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN"))
-      return
-    }
-
     val transportEnum = when (transport) {
       "softap" -> ESPConstants.TransportType.TRANSPORT_SOFTAP
       "ble" -> ESPConstants.TransportType.TRANSPORT_BLE
@@ -232,6 +239,30 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
       1 -> ESPConstants.SecurityType.SECURITY_1
       2 -> ESPConstants.SecurityType.SECURITY_2
       else -> ESPConstants.SecurityType.SECURITY_2
+    }
+
+    // Permission checks by transport type.
+    when (transportEnum) {
+      ESPConstants.TransportType.TRANSPORT_BLE -> {
+        if (!hasBluetoothPermissions()) {
+          promise?.reject(Error("Missing one of the following permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN"))
+          return
+        }
+      }
+
+      ESPConstants.TransportType.TRANSPORT_SOFTAP -> {
+        if (!hasWifiPermission() || !hasWifiScanPermissions()) {
+          promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION or NEARBY_WIFI_DEVICES"))
+          return
+        }
+      }
+
+      else -> {
+        if (!hasBluetoothPermissions()) {
+          promise?.reject(Error("Missing one of the following permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN"))
+          return
+        }
+      }
     }
 
     // If no ESP device found in list (no scan has been performed), create a new one
@@ -279,21 +310,12 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
       }
     } else {
       // Ensure WiFi access point info is present and password is non-null for SoftAP.
-      if (espDevice?.wifiDevice == null) {
-        val wifiDevice = WiFiAccessPoint()
-        wifiDevice.wifiName = deviceName
-        // For open AP we pass empty string, avoid null which crashes setWpa2Passphrase in SDK
-        wifiDevice.password = softAPPassword ?: ""
-        espDevice?.wifiDevice = wifiDevice
-      } else {
-        // If WiFi device originates from scan, password may be null. Force non-null.
-        if (espDevice?.wifiDevice?.password == null) {
-          espDevice?.wifiDevice?.password = softAPPassword ?: ""
-        } else {
-          // Always overwrite with provided password to ensure correctness
-          espDevice?.wifiDevice?.password = softAPPassword ?: ""
-        }
+      val wifiDevice = espDevice?.wifiDevice ?: WiFiAccessPoint().apply {
+        wifiName = deviceName
       }
+      // For open AP we pass empty string, avoid null which crashes setWpa2Passphrase in SDK
+      wifiDevice.password = softAPPassword ?: ""
+      espDevice?.wifiDevice = wifiDevice
 
       // Apply PoP and optional username for SoftAP as well
       espDevice?.proofOfPossession = proofOfPossession
@@ -385,8 +407,8 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
 
     if (espDevice.transportType == ESPConstants.TransportType.TRANSPORT_SOFTAP) {
       // Permission checks
-      if (!hasWifiPermission() || !hasFineLocationPermission()) {
-        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION"))
+      if (!hasWifiPermission() || !hasWifiScanPermissions()) {
+        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION or NEARBY_WIFI_DEVICES"))
         return
       }
     }
