@@ -216,12 +216,6 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
     username: String?,
     promise: Promise?
   ) {
-    // Permission checks
-    if (!hasBluetoothPermissions()) {
-      promise?.reject(Error("Missing one of the following permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN"))
-      return
-    }
-
     val transportEnum = when (transport) {
       "softap" -> ESPConstants.TransportType.TRANSPORT_SOFTAP
       "ble" -> ESPConstants.TransportType.TRANSPORT_BLE
@@ -232,6 +226,30 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
       1 -> ESPConstants.SecurityType.SECURITY_1
       2 -> ESPConstants.SecurityType.SECURITY_2
       else -> ESPConstants.SecurityType.SECURITY_2
+    }
+
+    // Permission checks by transport type.
+    when (transportEnum) {
+      ESPConstants.TransportType.TRANSPORT_BLE -> {
+        if (!hasBluetoothPermissions()) {
+          promise?.reject(Error("Missing one of the following permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN"))
+          return
+        }
+      }
+
+      ESPConstants.TransportType.TRANSPORT_SOFTAP -> {
+        if (!hasWifiPermission() || !hasFineLocationPermission()) {
+          promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION"))
+          return
+        }
+      }
+
+      else -> {
+        if (!hasBluetoothPermissions()) {
+          promise?.reject(Error("Missing one of the following permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN"))
+          return
+        }
+      }
     }
 
     // If no ESP device found in list (no scan has been performed), create a new one
@@ -279,21 +297,12 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
       }
     } else {
       // Ensure WiFi access point info is present and password is non-null for SoftAP.
-      if (espDevice?.wifiDevice == null) {
-        val wifiDevice = WiFiAccessPoint()
-        wifiDevice.wifiName = deviceName
-        // For open AP we pass empty string, avoid null which crashes setWpa2Passphrase in SDK
-        wifiDevice.password = softAPPassword ?: ""
-        espDevice?.wifiDevice = wifiDevice
-      } else {
-        // If WiFi device originates from scan, password may be null. Force non-null.
-        if (espDevice?.wifiDevice?.password == null) {
-          espDevice?.wifiDevice?.password = softAPPassword ?: ""
-        } else {
-          // Always overwrite with provided password to ensure correctness
-          espDevice?.wifiDevice?.password = softAPPassword ?: ""
-        }
+      val wifiDevice = espDevice?.wifiDevice ?: WiFiAccessPoint().apply {
+        wifiName = deviceName
       }
+      // For open AP we pass empty string, avoid null which crashes setWpa2Passphrase in SDK
+      wifiDevice.password = softAPPassword ?: ""
+      espDevice?.wifiDevice = wifiDevice
 
       // Apply PoP and optional username for SoftAP as well
       espDevice?.proofOfPossession = proofOfPossession
