@@ -5,7 +5,7 @@ Android and iOS bridge for ESP IDF provisioning. Provides a unified interface fo
 - https://github.com/espressif/esp-idf-provisioning-android
 - https://github.com/espressif/esp-idf-provisioning-ios
 
-SoftAP transport is supported without requiring any Bluetooth permissions. Ensure your Android app requests Wi-Fi state and fine location permissions so the bridge can discover and connect to the SoftAP network.
+SoftAP transport is supported without requiring any Bluetooth permissions. Ensure your Android app requests Wi-Fi state permissions plus either `ACCESS_FINE_LOCATION` (Android 12 and below) or `NEARBY_WIFI_DEVICES` (Android 13+) so the bridge can discover and connect to the SoftAP network.
 
 QR code scanning is deliberately not supported. This can be done using other react-native libraries.
 

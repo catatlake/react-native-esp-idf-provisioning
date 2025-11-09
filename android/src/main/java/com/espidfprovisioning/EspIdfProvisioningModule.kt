@@ -79,6 +79,19 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
     return ContextCompat.checkSelfPermission(reactApplicationContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
   }
 
+  private fun hasWifiScanPermissions(): Boolean {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      val hasNearbyWifiDevicesPermission =
+        ContextCompat.checkSelfPermission(reactApplicationContext, Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+
+      if (hasNearbyWifiDevicesPermission) {
+        return true
+      }
+    }
+
+    return hasFineLocationPermission()
+  }
+
   @SuppressLint("MissingPermission")
   @ReactMethod
   override fun searchESPDevices(devicePrefix: String, transport: String, security: Double, promise: Promise?) {
@@ -155,8 +168,8 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
         }
       })
     } else {
-      if (!hasWifiPermission() || !hasFineLocationPermission()) {
-        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION"))
+      if (!hasWifiPermission() || !hasWifiScanPermissions()) {
+        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION or NEARBY_WIFI_DEVICES"))
       }
 
       espProvisionManager.searchWiFiEspDevices(devicePrefix, object : WiFiScanListener {
@@ -238,8 +251,8 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
       }
 
       ESPConstants.TransportType.TRANSPORT_SOFTAP -> {
-        if (!hasWifiPermission() || !hasFineLocationPermission()) {
-          promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION"))
+        if (!hasWifiPermission() || !hasWifiScanPermissions()) {
+          promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION or NEARBY_WIFI_DEVICES"))
           return
         }
       }
@@ -394,8 +407,8 @@ class EspIdfProvisioningModule internal constructor(context: ReactApplicationCon
 
     if (espDevice.transportType == ESPConstants.TransportType.TRANSPORT_SOFTAP) {
       // Permission checks
-      if (!hasWifiPermission() || !hasFineLocationPermission()) {
-        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION"))
+      if (!hasWifiPermission() || !hasWifiScanPermissions()) {
+        promise?.reject(Error("Missing one of the following permissions: CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION or NEARBY_WIFI_DEVICES"))
         return
       }
     }
