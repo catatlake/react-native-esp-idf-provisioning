@@ -31,9 +31,6 @@
     "@react-native-community/cli-platform-ios": "18.0.0",
     "babel-plugin-module-resolver": "^5.0.2"
   },
-  "resolutions": {
-    "deepmerge": "4.3.1"
-  },
   "engines": {
     "node": ">=18"
   }
